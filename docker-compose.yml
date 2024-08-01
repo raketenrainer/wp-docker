@@ -1,0 +1,74 @@
+version: '3'
+
+services:
+  db:
+    image: mariadb
+    container_name: db
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - dbdata:/var/lib/mysql
+    command: '--default-authentication-plugin=mysql_native_password'
+    networks:
+      - app-network
+
+  wordpress:
+    depends_on:
+      - db
+    image: wordpress:6.6.1-php8.1-fpm-alpine
+    container_name: wordpress
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - wordpress:/var/www/html
+    networks:
+      - app-network
+
+  webserver:
+    depends_on:
+      - wordpress
+    image: nginx:1.27.0-alpine
+    container_name: webserver
+    restart: unless-stopped
+    ports:
+      - "6080:6080"
+    volumes:
+      - wordpress:/var/www/html
+      - ./nginx-conf:/etc/nginx/conf.d
+      - certbot-etc:/etc/letsencrypt
+    networks:
+      - app-network
+
+  certbot:
+    depends_on:
+      - webserver
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - wordpress:/var/www/html
+    command: certonly --webroot --webroot-path=/var/www/html --email zarthrainer@gmail.com --agree-tos --no-eff-email --staging -d wp.local -d www.wp.local
+
+volumes:
+  certbot-etc:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/mnt/c/Users/rzart/Documents/MY PROJECTS/wordpress/.docker/certbot'
+  wordpress:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/mnt/c/Users/rzart/Documents/MY PROJECTS/wordpress/.docker/wordpress'
+  dbdata:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/mnt/c/Users/rzart/Documents/MY PROJECTS/wordpress/.docker/dbdata'
+
+networks:
+  app-network:
+    driver: bridge
